@@ -1,0 +1,60 @@
+[gd_scene load_steps=2 format=2]
+
+[ext_resource path="res://addons/response_wires/scenes/edit_output_popup/edit_output_popup.gd" type="Script" id=1]
+
+[node name="Popup" type="WindowDialog"]
+visible = true
+margin_right = 340.0
+margin_bottom = 110.0
+window_title = "Output Signals"
+script = ExtResource( 1 )
+
+[node name="Label" type="Label" parent="."]
+margin_left = 10.0
+margin_top = 10.0
+margin_right = 240.0
+margin_bottom = 24.0
+text = "Output signal"
+
+[node name="TextEdit" type="LineEdit" parent="."]
+visible = false
+margin_left = 20.0
+margin_top = 34.0
+margin_right = 320.0
+margin_bottom = 58.0
+rect_min_size = Vector2( 200, 24 )
+text = "activate_output"
+
+[node name="Label2" type="Label" parent="."]
+visible = false
+margin_left = 10.0
+margin_top = 70.0
+margin_right = 240.0
+margin_bottom = 84.0
+text = "Dectivation signal"
+
+[node name="TextEdit2" type="LineEdit" parent="."]
+visible = false
+margin_left = 20.0
+margin_top = 94.0
+margin_right = 320.0
+margin_bottom = 118.0
+rect_min_size = Vector2( 200, 24 )
+text = "deactivate_output"
+
+[node name="OkButton" type="Button" parent="."]
+margin_left = 270.0
+margin_top = 70.0
+margin_right = 320.0
+margin_bottom = 100.0
+text = "Ok"
+
+[node name="SignalOptions" type="OptionButton" parent="."]
+margin_left = 20.0
+margin_top = 30.0
+margin_right = 320.0
+margin_bottom = 60.0
+[connection signal="text_changed" from="TextEdit" to="." method="_on_TextEdit_text_changed"]
+[connection signal="text_changed" from="TextEdit2" to="." method="_on_TextEdit2_text_changed"]
+[connection signal="pressed" from="OkButton" to="." method="_on_OkButton_pressed"]
+[connection signal="item_selected" from="SignalOptions" to="." method="_on_SignalOptions_item_selected"]
