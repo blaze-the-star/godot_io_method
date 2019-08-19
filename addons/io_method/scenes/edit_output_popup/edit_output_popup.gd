@@ -1,30 +1,34 @@
 tool
 extends WindowDialog
 #
-export(Resource) var editing_output setget set_editing_output, get_editing_output
+export(Resource) var editing_output
 
 func _ready():
-	if editing_output is OutputSlot2D:
-		$TextEdit.set_text( editing_output.activation_signal )
-		$TextEdit2.set_text( editing_output.deactivation_signal )
+	#Create signals list
+	var signal_list:Array = []
+	for signal_dict in editing_output.get_node("../../../").get_signal_list():
+		signal_list.append( signal_dict.name )
+	signal_list.sort()
 		
-	for signal_name in editing_output.get_node("../../../").get_signal_list():
-		pass
-
-func _on_TextEdit_text_changed( new_text:String ) -> void:
-	if editing_output is OutputSlot2D:
-		editing_output.activation_signal = new_text
-
-func _on_TextEdit2_text_changed( new_text:String ) -> void:
-	if editing_output is OutputSlot2D:
-		editing_output.deactivation_signal = new_text
-
-func get_editing_output() -> Node2D:
-	return editing_output
-
-func set_editing_output( value:Node2D ) -> void:
-	editing_output = value
+	#Add items
+	var signal_word_category:String = ""
+	for signal_name in signal_list:
+#		var first_word:String = signal_name.split("_")[0]
+#		if signal_word_category != "" and signal_word_category != first_word:
+#			$SignalOptions.add_separator()
+#		signal_word_category = first_word
+			
+		$SignalOptions.add_item( signal_name )
+		
+	#Set initially selected
+	for id in range($SignalOptions.get_item_count()):
+		if editing_output.activation_signal == $SignalOptions.get_item_text(id):
+			$SignalOptions.select(id)
+			break
 
 func _on_OkButton_pressed():
 	call_deferred("hide")
 	call_deferred("queue_free")
+	
+func _on_OptionButton_item_selected( id:int ):
+	editing_output.activation_signal = $SignalOptions.get_item_text(id)

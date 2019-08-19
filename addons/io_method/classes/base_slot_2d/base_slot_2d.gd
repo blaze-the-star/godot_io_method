@@ -2,9 +2,10 @@ tool
 extends IOMethod2D
 class_name BaseSlot2D, "res://addons/io_method/classes/base_slot_2d/base_slot_2d.png"
 
-signal dragged
+signal dragged( dragging_slot )
 
 var custom_wires:Dictionary = {} setget set_custom_wires
+var previous_global_position:Vector2 = Vector2(0,0)
 var wire_generation:Dictionary = {}
 
 var is_drawing:bool = true setget set_is_drawing
@@ -17,26 +18,28 @@ func _draw():
 			draw_wire( wire_name )
 		
 func _on_dragged( dragging_slot ) -> void:
-	"""
-	Self is being dragged
-	"""
 	pass
-	for wire_name in custom_wires:
-		var wire_info:Dictionary = custom_wires[wire_name]
-		if "begin" in wire_info and "end" in wire_info:
-			var wire_position_changed:bool = re_rig_wire( wire_name )
 
-	update()
+func _process( delta:float ) -> void:
+	#Only called in editor
+	
+	if previous_global_position != get_global_position():
+		previous_global_position = get_global_position()
+		emit_signal( "dragged", self )
 
 func _ready():
 	add_to_group( "slot_2d" )
+	
+	if Engine.editor_hint:
+		set_process( true )
+		connect( "dragged", self, "_on_dragged" )
+	else:
+		set_process( false )
 	
 	#Set owner to editing scene
 	var scene_child = get_node("../../../../")
 	if scene_child != null:
 		set_owner( scene_child.get_owner() )
-	
-	connect( "dragged", self, "_on_dragged" )
 	
 func create_wire_curve( begin:Vector2, end:Vector2 ) -> PoolVector2Array: #Overridable
 	begin = Vector2( begin.x-get_global_position().x, begin.y-get_global_position().y )
@@ -87,24 +90,26 @@ func generate_wire( wire_name, render_on_completion:bool=true ) -> void:
 		if render_on_completion:
 			update()
 	
-func re_rig_wire( wire_name ) -> bool:
+func re_rig_wire( wire_path ) -> bool:
 	"""
 	Rigs wire points to wire's begin_node and end_nodes (Returns if changed)
 	"""
-	var wire_info:Dictionary = custom_wires[wire_name]
+	var wire_info:Dictionary = custom_wires[wire_path]
 	var is_changed:bool = false
 	if "begin" in wire_info and "begin_node" in wire_info:
-		if wire_info["begin"] != wire_info["begin_node"].get_global_position():
-			wire_info["begin"] = wire_info["begin_node"].get_global_position()
+		var begin_node:Node = get_node(wire_info["begin_node"])
+		if wire_info["begin"] != begin_node.get_global_position():
+			wire_info["begin"] = begin_node.get_global_position()
 			is_changed = true
 	if "end" in wire_info and "end_node" in wire_info:
-		if wire_info["end"] != wire_info["end_node"].get_global_position():
-			wire_info["end"] = wire_info["end_node"].get_global_position()
+		var end_node:Node = get_node(wire_info["end_node"])
+		if wire_info["end"] != end_node.get_global_position():
+			wire_info["end"] = end_node.get_global_position()
 			is_changed = true
 
 	set_custom_wires( custom_wires )
 	#Generate new wire
-	generate_wire( wire_name )
+	generate_wire( wire_path )
 			
 	return is_changed
 	

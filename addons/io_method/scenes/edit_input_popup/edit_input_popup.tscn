@@ -1,49 +1,46 @@
 [gd_scene load_steps=2 format=2]
 
-[ext_resource path="res://addons/response_wires/scenes/edit_input_popup/edit_input_popup.gd" type="Script" id=1]
+[ext_resource path="res://addons/io_method/scenes/edit_input_popup/edit_input_popup.gd" type="Script" id=1]
 
 [node name="Popup" type="WindowDialog"]
 margin_right = 340.0
-margin_bottom = 170.0
+margin_bottom = 180.0
 window_title = "Input Methods"
 script = ExtResource( 1 )
 
 [node name="Label" type="Label" parent="."]
 margin_left = 10.0
-margin_top = 10.0
 margin_right = 240.0
-margin_bottom = 24.0
+margin_bottom = 14.0
 text = "Activation method"
 
-[node name="TextEdit" type="LineEdit" parent="."]
+[node name="LineEdit" type="LineEdit" parent="."]
 margin_left = 20.0
-margin_top = 34.0
+margin_top = 30.0
 margin_right = 320.0
-margin_bottom = 58.0
-rect_min_size = Vector2( 200, 24 )
-text = "_on_signal_activated"
+margin_bottom = 54.0
 
 [node name="Label2" type="Label" parent="."]
+visible = false
 margin_left = 10.0
 margin_top = 70.0
 margin_right = 240.0
 margin_bottom = 84.0
-text = "Dectivation method"
+text = "Deactivation method"
 
-[node name="TextEdit2" type="LineEdit" parent="."]
+[node name="LineEdit2" type="LineEdit" parent="."]
+visible = false
 margin_left = 20.0
-margin_top = 94.0
+margin_top = 100.0
 margin_right = 320.0
-margin_bottom = 118.0
-rect_min_size = Vector2( 200, 24 )
-text = "_on_signal_deactivated"
+margin_bottom = 124.0
 
 [node name="OkButton" type="Button" parent="."]
 margin_left = 270.0
-margin_top = 130.0
+margin_top = 140.0
 margin_right = 320.0
-margin_bottom = 160.0
+margin_bottom = 170.0
 text = "Ok"
-[connection signal="text_changed" from="TextEdit" to="." method="_on_TextEdit_text_changed"]
-[connection signal="text_changed" from="TextEdit2" to="." method="_on_TextEdit2_text_changed"]
+[connection signal="text_changed" from="LineEdit" to="." method="_on_LineEdit_text_changed"]
+[connection signal="text_changed" from="LineEdit2" to="." method="_on_LineEdit2_text_changed"]
 [connection signal="pressed" from="OkButton" to="." method="_on_OkButton_pressed"]

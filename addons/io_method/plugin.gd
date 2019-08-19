@@ -10,8 +10,13 @@ enum EDIT_ACTIONS {
 enum EDIT_MODES {
 	NONE
 	EDIT_SLOTS
+	EDIT_WIRES
 	CONNECT_SIGNAL
 	REMOVE_SIGNAL
+}
+
+enum EDITING_NODES {
+	
 }
 
 enum SLOT_TYPES {
@@ -31,25 +36,41 @@ var selected_response_wire:Node
 var selected_slot:Node
 
 #Tool bar
-var editing_mode_button:Node = preload("res://addons/io_method/scenes/edit_mode_button/edit_mode_button.tscn").instance()
-var toggle_placing_slot_type:Node = preload("res://addons/io_method/scenes/toggle_placing_slot_type/toggle_placing_slot_type.tscn").instance()
+var editing_mode_button:Node# = preload("res://addons/io_method/scenes/edit_mode_button/edit_mode_button.tscn").instance()
+var editing_wires_button:Node# = preload("res://addons/io_method/scenes/edit_wires_button/edit_wires_button.tscn").instance()
+var toggle_placing_slot_type:Node# = preload("res://addons/io_method/scenes/toggle_placing_slot_type/toggle_placing_slot_type.tscn").instance()
 
 #Nodes
 var popup_menu
 
 func _enter_tree():
+	editing_mode_button = preload("res://addons/io_method/scenes/edit_mode_button/edit_mode_button.tscn").instance()
 	add_control_to_container( CONTAINER_CANVAS_EDITOR_MENU, editing_mode_button )
 	editing_mode_button.connect( "toggled", self, "set_is_editing" )
 	editing_mode_button.hide()
 	
+	editing_wires_button = preload("res://addons/io_method/scenes/edit_wires_button/edit_wires_button.tscn").instance()
+	add_control_to_container( CONTAINER_CANVAS_EDITOR_MENU, editing_wires_button )
+	editing_wires_button.connect( "toggled", self, "set_is_editing_wires" )
+	editing_wires_button.show()
+	
+	toggle_placing_slot_type = preload("res://addons/io_method/scenes/toggle_placing_slot_type/toggle_placing_slot_type.tscn").instance()
 	add_control_to_container( CONTAINER_CANVAS_EDITOR_MENU, toggle_placing_slot_type )
 	toggle_placing_slot_type.connect( "toggled", self, "_on_toggle_placing_slot_type" )
 	toggle_placing_slot_type.hide()
 
 func _exit_tree():
-	remove_control_from_container( CONTAINER_CANVAS_EDITOR_MENU, editing_mode_button )
-	remove_control_from_container( CONTAINER_CANVAS_EDITOR_MENU, toggle_placing_slot_type )
-	pass
+	if editing_mode_button != null:
+		remove_control_from_container( CONTAINER_CANVAS_EDITOR_MENU, editing_mode_button )
+		editing_mode_button.queue_free()
+	
+	if editing_wires_button != null:
+		remove_control_from_container( CONTAINER_CANVAS_EDITOR_MENU, editing_wires_button )
+		editing_wires_button.queue_free()
+	
+	if toggle_placing_slot_type != null:
+		remove_control_from_container( CONTAINER_CANVAS_EDITOR_MENU, toggle_placing_slot_type )
+		toggle_placing_slot_type.queue_free()
 	
 func _on_toggle_placing_slot_type( toggled_on:bool ) -> void:
 	if not toggled_on:
@@ -57,13 +78,23 @@ func _on_toggle_placing_slot_type( toggled_on:bool ) -> void:
 	else:
 		placing_slot_type = SLOT_TYPES.INPUT
 	
+func get_mouse_position_in_canvas() -> Vector2:
+	var io_hubs:Array  = get_editor_interface().get_edited_scene_root().get_tree().get_nodes_in_group("io_hub_2d")
+	if len(io_hubs) > 0:
+		return io_hubs[0].get_global_mouse_position()
+		
+	return Vector2(0,0)
+	
 func forward_canvas_gui_input( event:InputEvent ) -> bool:
-	if selected_response_wire != null:
-		#Edit slots
-		if is_editing:
-			return handle_input_edit_mode( event )
-		#Wire manipulation
-		return handle_input_wire_mode( event )
+	var io_hubs:Array  = get_editor_interface().get_edited_scene_root().get_tree().get_nodes_in_group("io_hub_2d")
+	if len(io_hubs) > 0 and selected_node != null:
+		
+		match edit_mode:
+			EDIT_MODES.EDIT_WIRES:
+				return handle_input_wire_mode( event )
+					
+			EDIT_MODES.EDIT_SLOTS:
+				return handle_input_edit_mode( event )
 			
 	return false
 	
@@ -72,8 +103,18 @@ func handle_input_edit_mode( event:InputEvent ) -> bool:
 	Handle inputs for editing slots
 	"""
 	if event is InputEventMouseButton:
-		var mouse_pos:Vector2 = selected_response_wire.get_global_mouse_position()
-		var slot_within_range = selected_response_wire.get_slots_within_range( mouse_pos )
+		var mouse_pos:Vector2 = get_mouse_position_in_canvas()
+		
+		#Get clicked slots
+		var io_hubs = get_editor_interface().get_edited_scene_root().get_tree().get_nodes_in_group("io_hub_2d")
+		var slot_within_range
+		if io_hubs == []:
+			return false
+		for io_hub_2d in io_hubs:
+			var clicked_slot = io_hub_2d.get_slot_within_range( mouse_pos )
+			if clicked_slot != null:
+				slot_within_range = clicked_slot
+				break
 		
 		match edit_action:
 			EDIT_ACTIONS.NONE:
@@ -83,6 +124,7 @@ func handle_input_edit_mode( event:InputEvent ) -> bool:
 						open_edit_output_menu( slot_within_range )
 					if slot_within_range is InputSlot2D:
 						open_edit_input_menu( slot_within_range )
+					return true
 					
 				#Single Pressed
 				elif event.is_pressed():
@@ -92,9 +134,9 @@ func handle_input_edit_mode( event:InputEvent ) -> bool:
 						#Add output slot
 						if slot_within_range == null:
 							if placing_slot_type == SLOT_TYPES.OUTPUT:
-								selected_response_wire.add_output( mouse_pos.snapped(Vector2(10,10)) )
+								selected_node.add_output( mouse_pos.snapped(Vector2(10,10)) )
 							elif placing_slot_type == SLOT_TYPES.INPUT:
-								selected_response_wire.add_input( mouse_pos.snapped(Vector2(10,10)) )
+								selected_node.add_input( mouse_pos.snapped(Vector2(10,10)) )
 						#Begin moving
 						else:
 							selected_slot = slot_within_range
@@ -103,10 +145,10 @@ func handle_input_edit_mode( event:InputEvent ) -> bool:
 						return true
 							
 					#Right clicked
-					if event.get_button_index() == BUTTON_RIGHT and slot_within_range != null:
+					if event.get_button_index() == BUTTON_RIGHT:
 						#Delete output slot
-						selected_response_wire.remove_slot( slot_within_range )
-				
+						if slot_within_range != null:
+							selected_node.remove_slot( slot_within_range )
 						return true
 			
 			EDIT_ACTIONS.MOVE:
@@ -119,8 +161,7 @@ func handle_input_edit_mode( event:InputEvent ) -> bool:
 				
 	#Mouse motion
 	elif event is InputEventMouseMotion:
-		var mouse_pos:Vector2 = selected_response_wire.get_global_mouse_position()
-		var slot_within_range = selected_response_wire.get_slots_within_range( mouse_pos )
+		var mouse_pos:Vector2 = get_mouse_position_in_canvas()
 		
 		match edit_action:
 			EDIT_ACTIONS.MOVE:
@@ -133,16 +174,25 @@ func handle_input_edit_mode( event:InputEvent ) -> bool:
 					selected_slot.call_deferred( "emit_signal", "dragged", selected_slot )
 				else:
 					edit_action = EDIT_ACTIONS.NONE
-				
 				return true
 		
 	return false
 	
 func handle_input_wire_mode( event:InputEvent ) -> bool:
 	if event is InputEventMouseButton:
-		var mouse_pos:Vector2 = selected_response_wire.get_global_mouse_position()
-		var slot_within_range = selected_response_wire.get_slots_within_range( mouse_pos )
+		var mouse_pos:Vector2 = get_mouse_position_in_canvas()
 		
+		#Get clicked slots
+		var io_hubs = get_editor_interface().get_edited_scene_root().get_tree().get_nodes_in_group("io_hub_2d")
+		var slot_within_range
+		if io_hubs == []:
+			return false
+		for io_hub_2d in io_hubs:
+			var clicked_slot = io_hub_2d.get_slot_within_range( mouse_pos )
+			if clicked_slot != null:
+				slot_within_range = clicked_slot
+				break
+								
 		match edit_action:
 			EDIT_ACTIONS.NONE:
 				#Single Pressed
@@ -153,27 +203,31 @@ func handle_input_wire_mode( event:InputEvent ) -> bool:
 						if slot_within_range is OutputSlot2D:
 							selected_slot = slot_within_range
 							edit_action = EDIT_ACTIONS.CONNECT_WIRE_FROM_OUTPUT
-							return true
+						return true
+						
+					#Right click
+					if event.get_button_index() == BUTTON_RIGHT:
+						#Removee connections from output
+						if slot_within_range is OutputSlot2D:
+							slot_within_range.disconnect_all_input_slots()
+						#Removee connections from input
+						if slot_within_range is InputSlot2D:
+							for output in slot_within_range.connected_outputs:
+								output.disconnect_from_input_slot( slot_within_range )
+							slot_within_range.connected_outputs = []
+						return true
 					
 			EDIT_ACTIONS.CONNECT_WIRE_FROM_OUTPUT:
 				#Single Pressed
 				if event.is_pressed():
 					#Left click
 					if event.get_button_index() == BUTTON_LEFT:
-						#Find clicked input slot in any IOHub2D
-						var input_slot_owner = null
-						var clicked_input = null
-						for response_wire_2d in get_editor_interface().get_edited_scene_root().get_tree().get_nodes_in_group("response_wire_2d"):
-							clicked_input = response_wire_2d.get_input_within_range( mouse_pos )
-							if clicked_input != null:
-								input_slot_owner = response_wire_2d
-								break
-								
 						#Connect output wire to clicked InputSlot2D
-						selected_slot.connect_to_input_slot( clicked_input )
-						if "plugin_dragging" in selected_slot.custom_wires:
-							selected_slot.custom_wires.erase("plugin_dragging")
-								
+						if slot_within_range is InputSlot2D:
+							selected_slot.connect_to_input_slot( slot_within_range )
+							if "plugin_dragging" in selected_slot.custom_wires:
+								selected_slot.custom_wires.erase("plugin_dragging")
+							
 						return true
 							
 					#Right click
@@ -187,7 +241,7 @@ func handle_input_wire_mode( event:InputEvent ) -> bool:
 					
 	#Mouse motion
 	elif event is InputEventMouseMotion:
-		var mouse_pos:Vector2 = selected_response_wire.get_global_mouse_position()
+		var mouse_pos:Vector2 = get_mouse_position_in_canvas()
 		
 		match edit_action:
 			EDIT_ACTIONS.CONNECT_WIRE_FROM_OUTPUT:
@@ -195,19 +249,41 @@ func handle_input_wire_mode( event:InputEvent ) -> bool:
 					selected_slot.custom_wires["plugin_dragging"] = {"begin":selected_slot.get_global_position(), "end":mouse_pos}
 					selected_slot.generate_wire( "plugin_dragging" )
 					
-					
 	return false
 	
 func handles( object ) -> bool:
-	if object.has_method("get_children"):
-		for child in object.get_children():
-			if child is IOHub2D:
-				on_focus_entered_response_wire_parent( object, child )
-				return true
-				
-		on_focus_left_response_wire_parent( object )
+	#Allow slot edit mode
+	if object is IOHub2D:
+		on_focus_entered_io_hub_2d( object )
+	elif selected_node is IOHub2D:
+		on_focus_left_io_hub_2d( selected_node )
+	if object.has_method( "get_children" ):
+		selected_node = object
+	return true
 	
-	return false
+func on_focus_entered_io_hub_2d( io_hub:IOHub2D ) -> void:
+	selected_node = io_hub
+	edit_mode = EDIT_MODES.EDIT_SLOTS
+	#Show buttons
+	if editing_mode_button != null:
+		editing_mode_button.show()
+	if toggle_placing_slot_type != null:
+		toggle_placing_slot_type.show()
+	#Disallow slot edit mode
+	#Show slots
+	selected_node.get_tree().call_group( "slot_2d", "show" )
+		
+func on_focus_left_io_hub_2d( selected_node:Node ) -> void:
+	selected_node = selected_node
+	edit_mode = EDIT_MODES.NONE
+	#Hide buttons
+	if editing_mode_button != null:
+		editing_mode_button.hide()
+	if toggle_placing_slot_type != null:
+		toggle_placing_slot_type.hide()
+	#Disallow slot edit mode
+	#Hide slots
+	selected_node.get_tree().call_group( "slot_2d", "hide" )
 	
 func on_focus_entered_response_wire_parent( parent:Node, response_wire:IOHub2D ) -> void:
 	selected_node = parent
@@ -259,3 +335,19 @@ func open_edit_output_menu( editing_output_slot ) -> void:
 func set_is_editing( value:bool ) -> void:
 	is_editing = value
 	edit_mode = 0
+	
+func set_is_editing_wires( value:bool ) -> void:
+	edit_mode = EDIT_MODES.NONE
+	#Show slots
+	if value:
+		edit_mode = EDIT_MODES.EDIT_WIRES
+		get_editor_interface().get_edited_scene_root().get_tree().call_group( "slot_2d", "show" )
+	#Hide slots
+	elif not selected_node is IOHub2D:
+		get_editor_interface().get_edited_scene_root().get_tree().call_group( "slot_2d", "hide" )
+	
+	
+	
+	
+	
+	

@@ -22,16 +22,15 @@ func _ready():
 	call_deferred( "initialise_outputs_container" )
 	
 	if Engine.editor_hint:
-		add_to_group( "response_wire_2d" )
+		add_to_group( "io_hub_2d" )
 	
 func add_input( slot_position ):
-	initialise_inputs_container()
 	var new_input = InputSlot2D.new()
 	new_input.set_name( "Input" ) 
 
-	new_input.set_owner( inputs_container.get_owner() )
-	inputs_container.add_child(new_input)
-	new_input.set_owner( inputs_container.get_owner() )
+	new_input.set_owner( get_inputs_container().get_owner() )
+	get_inputs_container().add_child(new_input)
+	new_input.set_owner( get_inputs_container().get_owner() )
 
 	new_input.set_global_position(slot_position)
 	
@@ -40,33 +39,43 @@ func add_output( slot_position ):
 	var new_output = OutputSlot2D.new()
 	new_output.set_name( "Output" ) 
 	
-	new_output.set_owner( outputs_container.get_owner() )
-	outputs_container.add_child(new_output)
-	new_output.set_owner( outputs_container.get_owner() )
+	new_output.set_owner( get_outputs_container().get_owner() )
+	get_outputs_container().add_child(new_output)
+	new_output.set_owner( get_outputs_container().get_owner() )
 	
 	new_output.set_global_position(slot_position)
 	
 func get_input_within_range( point:Vector2 ) -> InputSlot2D:
-	if inputs_container != null:
-		for slot in inputs_container.get_children():
-			if slot is InputSlot2D:
-				var slot_pos_glb:Vector2 = slot.get_global_position()
-				if slot_pos_glb.distance_to( point ) < CONNECTION_SIZE_RADIUS:
-					return slot
+	for slot in get_inputs_container().get_children():
+		if slot is InputSlot2D:
+			var slot_pos_glb:Vector2 = slot.get_global_position()
+			if slot_pos_glb.distance_to( point ) < CONNECTION_SIZE_RADIUS:
+				return slot
 
 	return null
 	
+func get_inputs_container() -> Node2D:
+	if inputs_container == null:
+		initialise_inputs_container()
+		
+	return inputs_container
+	
 func get_output_within_range( point:Vector2 ) -> OutputSlot2D:
-	if outputs_container != null:
-		for output in outputs_container.get_children():
-			if output is OutputSlot2D:
-				var output_pos_glb:Vector2 = output.get_global_position()
-				if output_pos_glb.distance_to( point ) < CONNECTION_SIZE_RADIUS:
-					return output
+	for output in get_outputs_container().get_children():
+		if output is OutputSlot2D:
+			var output_pos_glb:Vector2 = output.get_global_position()
+			if output_pos_glb.distance_to( point ) < CONNECTION_SIZE_RADIUS:
+				return output
 			
 	return null
 	
-func get_slots_within_range( point:Vector2 ):
+func get_outputs_container() -> Node2D:
+	if outputs_container == null:
+		initialise_outputs_container()
+		
+	return outputs_container
+	
+func get_slot_within_range( point:Vector2 ):
 	"""
 	Returns the output that is within range of point (For getting of clicked on)
 	"""
@@ -97,9 +106,9 @@ func initialise_outputs_container():
 		outputs_container.set_owner( get_owner() )
 	
 func remove_slot( slot ) -> void:
-	if slot is InputSlot2D and inputs_container.get_children().has(slot):
+	if slot is InputSlot2D and get_inputs_container().get_children().has(slot):
 		slot.queue_free()
-	if slot is OutputSlot2D and outputs_container.get_children().has(slot):
+	if slot is OutputSlot2D and get_outputs_container().get_children().has(slot):
 		slot.queue_free()
 		
 		
