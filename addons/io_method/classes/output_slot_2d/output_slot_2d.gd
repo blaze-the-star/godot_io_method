@@ -15,7 +15,6 @@ var sent_initial_signal:bool = false
 var connected_inputs_hold:Array = [] 
 
 func _enter_tree() -> void:
-	print("joot")
 	update_wires_from_meta()
 
 func _exit_tree() -> void:
@@ -51,8 +50,10 @@ func _ready() -> void:
 	add_to_group( "output_slot_2d" )
 	
 	if Engine.editor_hint:
-#		connect( "script_changed", self, "_on_script_changed" )
-		connect( "tree_exited", self, "_exited_tree" )
+		if not is_connected( "script_changed", self, "_on_script_changed" ):
+			connect( "script_changed", self, "_on_script_changed" )
+		if not is_connected( "tree_exited", self, "_exited_tree" ):
+			connect( "tree_exited", self, "_exited_tree" )
 	else:
 		get_node("../../../").connect( activation_signal, self, "set_is_active" )
 	
@@ -66,19 +67,16 @@ func _on_input_slot_dragged( dragged_slot ) -> void:
 	if input_position_changed:
 		update()
 	
-#func _on_script_changed() -> void:
-#	update_wires_from_meta()
-#	update()
+func _on_script_changed() -> void:
+	update_wires_from_meta()
+	call_deferred( "update" )
 	
 func connect_slot( slot ) -> void:
-	print("fro")
 	var slot_path:String = get_data_holder().get_path_to(slot)
-	
-	if data["connected_inputs"].has(slot_path):
-		data["connected_inputs"].erase( slot_path )
-		
+
 	#Set in data
-	data["connected_inputs"].append( slot_path )
+	if not data["connected_inputs"].has(slot_path):
+		data["connected_inputs"].append( slot_path )
 	set_data( data )
 	#Draw wire
 	custom_wires[ slot_path ] = {"begin":get_global_position(), "end":slot.get_global_position(), "begin_node":get_data_holder().get_path_to(self), "end_node":slot_path}
@@ -86,7 +84,7 @@ func connect_slot( slot ) -> void:
 		slot.disconnect( "dragged", self, "_on_input_slot_dragged" )
 	slot.connect( "dragged", self, "_on_input_slot_dragged" )
 	generate_wire( slot_path, false )
-	
+
 	slot._on_connected_to_output( self )
 	
 func connect_slots( slots:Array ) -> void:
@@ -159,16 +157,15 @@ func set_is_active( value:float, force_update:bool=false ) -> void:
 	var connected_input_slots:Array = data["connected_inputs"]
 	set_has_updated_in_frame( true ) #Must be set before trigger signal is called, otherwise will never be set
 	for slot in connected_input_slots:
-		if has_node(slot):
+		if get_data_holder().has_node(slot):
 			value = max(value, -1)
 			value = min(value, 1)
-			get_node(slot).trigger_signal( is_active, value, force_update )
+			get_data_holder().get_node(slot).trigger_signal( is_active, value, force_update )
 			
 func update_wires_from_meta() -> void:
 	"""
 	Redraw wires using data from IOHub2D's parent
 	"""
-	print("jas")
 	data = get_data()
 	if not "connected_inputs" in data:
 		data["connected_inputs"] = []

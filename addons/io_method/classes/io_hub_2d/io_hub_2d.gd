@@ -92,9 +92,6 @@ func initialise_inputs_container():
 		inputs_container.set_name( "Inputs" )
 		add_child( inputs_container )
 		inputs_container.set_owner( get_owner() )
-		
-#	if get_parent().get_parent().get_owner() != null:
-#		inputs_container.set_owner( get_parent().get_parent().get_owner() )
 
 func initialise_outputs_container():
 	if has_node("Outputs"):
@@ -104,9 +101,6 @@ func initialise_outputs_container():
 		outputs_container.set_name( "Outputs" )
 		add_child( outputs_container )
 		outputs_container.set_owner( get_owner() )
-		
-#	if get_parent().get_parent().get_owner() != null:
-#		inputs_container.set_owner( get_parent().get_parent().get_owner() )
 
 func is_input_connected( input_index:int ):
 	"""

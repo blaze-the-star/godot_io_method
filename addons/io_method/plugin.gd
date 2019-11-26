@@ -358,8 +358,8 @@ func open_edit_output_menu( editing_output_slot ) -> void:
 	
 func set_is_drawing_slots( value:bool ) -> void:
 	is_drawing_slots = value
-	if selected_node.get_tree() != null:
-		selected_node.get_tree().set_group( "slot_2d", "is_drawing", is_drawing_slots )
+#	if selected_node.get_tree() != null:
+#		selected_node.get_tree().set_group( "slot_2d", "is_drawing", is_drawing_slots )
 	
 func set_is_editing( value:bool ) -> void:
 	is_editing = value
@@ -371,11 +371,11 @@ func set_is_editing_wires( value:bool ) -> void:
 	if value:
 		edit_mode = EDIT_MODES.EDIT_WIRES
 		set_is_drawing_slots( true )
-		get_editor_interface().get_edited_scene_root().get_tree().call_group( "slot_2d", "show" )
+#		get_editor_interface().get_edited_scene_root().get_tree().call_group( "slot_2d", "show" )
 	#Hide slots
 	elif not selected_node is IOHub2D:
 		set_is_drawing_slots( false )
-		get_editor_interface().get_edited_scene_root().get_tree().call_group( "slot_2d", "hide" )
+#		get_editor_interface().get_edited_scene_root().get_tree().call_group( "slot_2d", "hide" )
 	
 	
 	
