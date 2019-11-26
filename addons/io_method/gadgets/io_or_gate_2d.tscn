@@ -30,7 +30,7 @@ activation_method = "_input_slot_b_triggered"
 
 [node name="Output" type="Node2D" parent="IOHub2D/Outputs"]
 visible = false
-position = Vector2( 40, -30 )
+position = Vector2( 40, -20 )
 z_index = 1
 script = ExtResource( 4 )
 activation_signal = "power_changed"

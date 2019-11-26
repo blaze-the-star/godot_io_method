@@ -4,7 +4,7 @@
 
 [node name="Popup" type="WindowDialog"]
 margin_right = 340.0
-margin_bottom = 180.0
+margin_bottom = 124.0
 window_title = "Input Methods"
 script = ExtResource( 1 )
 
@@ -37,9 +37,9 @@ margin_bottom = 124.0
 
 [node name="OkButton" type="Button" parent="."]
 margin_left = 270.0
-margin_top = 140.0
+margin_top = 80.0
 margin_right = 320.0
-margin_bottom = 170.0
+margin_bottom = 110.0
 text = "Ok"
 [connection signal="text_changed" from="LineEdit" to="." method="_on_LineEdit_text_changed"]
 [connection signal="text_changed" from="LineEdit2" to="." method="_on_LineEdit2_text_changed"]

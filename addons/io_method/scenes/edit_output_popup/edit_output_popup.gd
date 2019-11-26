@@ -1,6 +1,8 @@
 tool
 extends WindowDialog
-#
+
+signal signal_changed( activation_signal )
+
 export(Resource) var editing_output
 
 func _ready():
@@ -13,11 +15,6 @@ func _ready():
 	#Add items
 	var signal_word_category:String = ""
 	for signal_name in signal_list:
-#		var first_word:String = signal_name.split("_")[0]
-#		if signal_word_category != "" and signal_word_category != first_word:
-#			$SignalOptions.add_separator()
-#		signal_word_category = first_word
-			
 		$SignalOptions.add_item( signal_name )
 		
 	#Set initially selected
@@ -30,5 +27,5 @@ func _on_OkButton_pressed():
 	call_deferred("hide")
 	call_deferred("queue_free")
 	
-func _on_OptionButton_item_selected( id:int ):
-	editing_output.activation_signal = $SignalOptions.get_item_text(id)
+func _on_SignalOptions_item_selected( id:int ):
+	emit_signal( "signal_changed", $SignalOptions.get_item_text(id) )

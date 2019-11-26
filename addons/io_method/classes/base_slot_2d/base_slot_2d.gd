@@ -5,45 +5,50 @@ class_name BaseSlot2D, "res://addons/io_method/classes/base_slot_2d/base_slot_2d
 signal dragged( dragging_slot )
 
 var custom_wires:Dictionary = {} setget set_custom_wires
-var previous_global_position:Vector2 = Vector2(0,0)
+var global_drawer:GlobalDrawer
+var has_updated_in_frame:bool = false setget set_has_updated_in_frame #A flag to remember if this slot has been updated in this frame
+var highlight_wires:bool = false
 var wire_generation:Dictionary = {}
 
-var is_drawing:bool = true setget set_is_drawing
+export var is_drawing:bool = true setget set_is_drawing
 
-func _draw():
-	if Engine.editor_hint:
+func _draw() -> void:
+	if is_drawing:
+		draw_set_transform( Vector2(0,0), -get_global_rotation(), Vector2(1/get_global_scale().x,1/get_global_scale().y) )
 		draw_slot()
-		
+
 		for wire_name in custom_wires:
 			draw_wire( wire_name )
+		
+func _get_slot_type() -> String:
+	return "base"
+		
+func _notification( what:int ) -> void:
+	if what == NOTIFICATION_TRANSFORM_CHANGED:
+		emit_signal( "dragged", self )
+		update()
 		
 func _on_dragged( dragging_slot ) -> void:
 	pass
 
-func _process( delta:float ) -> void:
-	#Only called in editor
-	
-	if previous_global_position != get_global_position():
-		previous_global_position = get_global_position()
-		emit_signal( "dragged", self )
+func _on_idle_frame() -> void:
+	set_has_updated_in_frame( false )
 
 func _ready():
 	add_to_group( "slot_2d" )
+	set_notify_transform( true )
 	
 	if Engine.editor_hint:
-		set_process( true )
-		connect( "dragged", self, "_on_dragged" )
+		if not is_connected( "dragged", self, "_on_dragged" ):
+			connect( "dragged", self, "_on_dragged" )
 	else:
-		set_process( false )
-	
-	#Set owner to editing scene
-	var scene_child = get_node("../../../../")
-	if scene_child != null:
-		set_owner( scene_child.get_owner() )
+		is_drawing = true
+		if not is_connected( "idle_frame", self, "_on_idle_frame" ):
+			get_tree().connect( "idle_frame", self, "_on_idle_frame" )
 	
 func create_wire_curve( begin:Vector2, end:Vector2 ) -> PoolVector2Array: #Overridable
-	begin = Vector2( begin.x-get_global_position().x, begin.y-get_global_position().y )
-	end = Vector2( end.x-get_global_position().x, end.y-get_global_position().y )
+	begin = Vector2(begin.x-get_global_position().x, begin.y-get_global_position().y)
+	end = Vector2(end.x-get_global_position().x, end.y-get_global_position().y)
 
 	var curve:Curve2D = Curve2D.new() 
 	var point_diff:Vector2 = Vector2(end.x-begin.x, end.y-begin.y )
@@ -69,6 +74,17 @@ func create_wire_curve( begin:Vector2, end:Vector2 ) -> PoolVector2Array: #Overr
 
 	return curve.get_baked_points()
 
+func delete_data() -> void:
+	"""
+	Removes the connected inputs meta data from the ResponseWire's parent's owner
+	"""
+	var owner_node:Node = get_data_holder()
+	if is_instance_valid(owner_node):
+		var data:Dictionary = owner_node.get_data()
+		if get_data_key() in data:
+			data[get_data_key()].queue_free()
+			owner_node.set_data( data )
+
 func draw_slot() -> void: #Overridable
 	draw_circle( Vector2(0,0), 8, Color(1,1,1) )
 	
@@ -76,7 +92,10 @@ func draw_wire( wire_name ) -> void: #Overridable
 	if wire_name in custom_wires:
 		var wire_info:Dictionary = custom_wires[wire_name]
 		if wire_name in wire_generation:
-			draw_polyline( wire_generation[wire_name], Color(1,0,0,.5), 2 )
+			if highlight_wires:
+				draw_polyline( wire_generation[wire_name], Color(1,1,1,.75), 3 )
+			else:
+				draw_polyline( wire_generation[wire_name], Color(1,0,0,.5), 2 )
 			#Draw dot at end of line
 			var dot_pos:Vector2 = wire_info["end"]
 			dot_pos.x -= get_global_position().x
@@ -89,6 +108,32 @@ func generate_wire( wire_name, render_on_completion:bool=true ) -> void:
 		wire_generation[wire_name] = create_wire_curve( wire_info["begin"], wire_info["end"] )
 		if render_on_completion:
 			update()
+			
+func get_data() -> Dictionary:
+	"""
+	Get the meta data related slots
+	"""
+	var owner_node:Node = get_data_holder()
+	if is_instance_valid(owner_node) and owner_node.has_meta( "io_" + _get_slot_type() ):
+		var type_data:Dictionary = owner_node.get_meta( "io_" + _get_slot_type() )
+		return type_data[get_data_key()] 
+		
+	return {}
+			
+func get_data_holder() -> Node:
+	"""
+	Returns the node that holds the meta data for this OutputSlot
+	"""
+	return get_node("../../../../")
+			
+func get_data_key() -> String:
+	"""
+	Get the meta name for the inputed variable
+	"""
+	var parent_owner = get_data_holder()
+	if is_instance_valid( parent_owner ):
+		return str( parent_owner.get_path_to(self) )
+	return ""
 	
 func re_rig_wire( wire_path ) -> bool:
 	"""
@@ -97,12 +142,12 @@ func re_rig_wire( wire_path ) -> bool:
 	var wire_info:Dictionary = custom_wires[wire_path]
 	var is_changed:bool = false
 	if "begin" in wire_info and "begin_node" in wire_info:
-		var begin_node:Node = get_node(wire_info["begin_node"])
+		var begin_node:Node = get_data_holder().get_node(wire_info["begin_node"])
 		if wire_info["begin"] != begin_node.get_global_position():
 			wire_info["begin"] = begin_node.get_global_position()
 			is_changed = true
 	if "end" in wire_info and "end_node" in wire_info:
-		var end_node:Node = get_node(wire_info["end_node"])
+		var end_node:Node = get_data_holder().get_node(wire_info["end_node"])
 		if wire_info["end"] != end_node.get_global_position():
 			wire_info["end"] = end_node.get_global_position()
 			is_changed = true
@@ -116,6 +161,18 @@ func re_rig_wire( wire_path ) -> bool:
 func set_custom_wires( value:Dictionary ) -> void:
 	custom_wires = value
 	
+func set_data( value:Dictionary ) -> void:
+	var owner_node:Node = get_data_holder()
+	if is_instance_valid(owner_node):
+		if not owner_node.has_meta( "io_" + _get_slot_type() ):
+			owner_node.set_meta( "io_" + _get_slot_type(), {} )
+		var data:Dictionary = owner_node.get_meta( "io_" + _get_slot_type() )
+		data[get_data_key()] = value
+		owner_node.set_meta( "io_" + _get_slot_type(), data )
+	
+func set_has_updated_in_frame( value:bool ) -> void:
+	has_updated_in_frame = value
+	
 func set_is_drawing( value:bool ) -> void:
 	is_drawing = value
 	update()
@@ -127,3 +184,12 @@ func is_a_signals_connected( signal_array:Array, connected_to:Node, method:Strin
 			
 	return false
 			
+			
+			
+
+	
+
+	
+
+	
+
