@@ -8,6 +8,7 @@ var custom_wires:Dictionary = {} setget set_custom_wires
 var global_drawer:GlobalDrawer
 var has_updated_in_frame:bool = false setget set_has_updated_in_frame #A flag to remember if this slot has been updated in this frame
 var highlight_wires:bool = false
+var old_holder_path:String = ""
 var wire_generation:Dictionary = {}
 
 export var is_drawing:bool = true setget set_is_drawing
@@ -19,14 +20,20 @@ func _draw() -> void:
 
 		for wire_name in custom_wires:
 			draw_wire( wire_name )
+
+func _enter_tree() -> void:
+	old_holder_path = node_to_meta_path( self )
 		
 func _get_slot_type() -> String:
 	return "base"
 		
 func _notification( what:int ) -> void:
-	if what == NOTIFICATION_TRANSFORM_CHANGED:
-		emit_signal( "dragged", self )
-		update()
+	match what:
+		NOTIFICATION_PATH_CHANGED:
+			old_holder_path = node_to_meta_path( self )
+		NOTIFICATION_TRANSFORM_CHANGED:
+			emit_signal( "dragged", self )
+			update()
 		
 func _on_dragged( dragging_slot ) -> void:
 	pass
@@ -43,8 +50,37 @@ func _ready():
 			connect( "dragged", self, "_on_dragged" )
 	else:
 		is_drawing = true
-		if not is_connected( "idle_frame", self, "_on_idle_frame" ):
+		if not get_tree().is_connected( "idle_frame", self, "_on_idle_frame" ):
 			get_tree().connect( "idle_frame", self, "_on_idle_frame" )
+			
+	old_holder_path = node_to_meta_path( self )
+	
+func clear_junk_meta() -> void:
+	var owner_node:Node = get_data_holder()
+	
+	#Clear output data
+	if owner_node.has_meta( "io_output" ):
+		var output_meta = owner_node.get_meta( "io_output" )
+		if output_meta != null:
+			for key in output_meta:
+				var data:Dictionary = output_meta[key]
+				if len(data["connected_inputs"]) == 0:
+					output_meta.erase( key )
+			if len(output_meta) == 0:
+				output_meta = null
+			owner_node.set_meta( "io_output", output_meta )
+	
+	#Clear input data
+	if owner_node.has_meta( "io_input" ):
+		var input_meta = owner_node.get_meta( "io_input" )
+		if input_meta != null:
+			for key in input_meta:
+				var data:Dictionary = input_meta[key]
+				if len(data["connected_outputs"]) == 0:
+					input_meta.erase( key )
+			if len(input_meta) == 0:
+				input_meta = null
+			owner_node.set_meta( "io_input", input_meta )
 	
 func create_wire_curve( begin:Vector2, end:Vector2 ) -> PoolVector2Array: #Overridable
 	begin = Vector2(begin.x-get_global_position().x, begin.y-get_global_position().y)
@@ -92,15 +128,25 @@ func draw_wire( wire_name ) -> void: #Overridable
 	if wire_name in custom_wires:
 		var wire_info:Dictionary = custom_wires[wire_name]
 		if wire_name in wire_generation:
-			if highlight_wires:
-				draw_polyline( wire_generation[wire_name], Color(1,1,1,.75), 3 )
-			else:
-				draw_polyline( wire_generation[wire_name], Color(1,0,0,.5), 2 )
-			#Draw dot at end of line
-			var dot_pos:Vector2 = wire_info["end"]
-			dot_pos.x -= get_global_position().x
-			dot_pos.y -= get_global_position().y
-			draw_circle( dot_pos, 3, Color(1,0,0) )
+			
+			var should_draw:bool = true
+			if "begin_node" in wire_info:
+				if not get_data_holder().has_node(wire_info["begin_node"]):
+					should_draw = false
+			if "end_node" in wire_info:
+				if not get_data_holder().has_node(wire_info["end_node"]):
+					should_draw = false
+				
+			if should_draw:
+				if highlight_wires:
+					draw_polyline( wire_generation[wire_name], Color(1,1,1,.75), 3 )
+				else:
+					draw_polyline( wire_generation[wire_name], Color(1,0,0,.5), 2 )
+				#Draw dot at end of line
+				var dot_pos:Vector2 = wire_info["end"]
+				dot_pos.x -= get_global_position().x
+				dot_pos.y -= get_global_position().y
+				draw_circle( dot_pos, 3, Color(1,0,0) )
 	
 func generate_wire( wire_name, render_on_completion:bool=true ) -> void:
 	if wire_name in custom_wires:
@@ -116,7 +162,8 @@ func get_data() -> Dictionary:
 	var owner_node:Node = get_data_holder()
 	if is_instance_valid(owner_node) and owner_node.has_meta( "io_" + _get_slot_type() ):
 		var type_data:Dictionary = owner_node.get_meta( "io_" + _get_slot_type() )
-		return type_data[get_data_key()] 
+		if get_data_key() in type_data:
+			return type_data[get_data_key()] 
 		
 	return {}
 			
@@ -124,8 +171,9 @@ func get_data_holder() -> Node:
 	"""
 	Returns the node that holds the meta data for this OutputSlot
 	"""
-	return get_node("../../../../")
-			
+	var ret:Node = get_node("../../../../")
+	return ret
+		
 func get_data_key() -> String:
 	"""
 	Get the meta name for the inputed variable
@@ -135,6 +183,21 @@ func get_data_key() -> String:
 		return str( parent_owner.get_path_to(self) )
 	return ""
 	
+func has_data_holder() -> bool:
+	return has_node( "../../../../" )
+	
+func meta_path_to_node( path:String ) -> Node:
+	if get_data_holder().has_node(path):
+		return get_data_holder().get_node( path )
+	else:
+		return null
+	
+func node_to_meta_path( node:Node ) -> String:
+	if has_data_holder():
+		return String(get_data_holder().get_path_to( node ))
+	else:
+		return ""
+	
 func re_rig_wire( wire_path ) -> bool:
 	"""
 	Rigs wire points to wire's begin_node and end_nodes (Returns if changed)
@@ -142,21 +205,37 @@ func re_rig_wire( wire_path ) -> bool:
 	var wire_info:Dictionary = custom_wires[wire_path]
 	var is_changed:bool = false
 	if "begin" in wire_info and "begin_node" in wire_info:
-		var begin_node:Node = get_data_holder().get_node(wire_info["begin_node"])
-		if wire_info["begin"] != begin_node.get_global_position():
-			wire_info["begin"] = begin_node.get_global_position()
-			is_changed = true
+		if get_data_holder().has_node( wire_info["begin_node"] ):
+			var begin_node:Node = get_data_holder().get_node( wire_info["begin_node"] )
+			if begin_node != null and wire_info["begin"] != begin_node.get_global_position():
+				wire_info["begin"] = begin_node.get_global_position()
+				is_changed = true
 	if "end" in wire_info and "end_node" in wire_info:
-		var end_node:Node = get_data_holder().get_node(wire_info["end_node"])
-		if wire_info["end"] != end_node.get_global_position():
-			wire_info["end"] = end_node.get_global_position()
-			is_changed = true
+		if get_data_holder().has_node( wire_info["end_node"] ):
+			var end_node:Node = get_data_holder().get_node(wire_info["end_node"])
+			if end_node != null and wire_info["end"] != end_node.get_global_position():
+				wire_info["end"] = end_node.get_global_position()
+				is_changed = true
 
 	set_custom_wires( custom_wires )
 	#Generate new wire
 	generate_wire( wire_path )
 			
 	return is_changed
+	
+func remove_meta_reference( reference_path:String, slot_key:String="" ) -> void:
+	"""
+	Removes the reference_path from the data-holder's slot data
+	"""
+	
+	if slot_key == "":
+		slot_key = "io_" + _get_slot_type()
+		
+	if get_data_holder().has_meta( slot_key ):
+		var meta_data:Dictionary = get_data_holder().get_meta( slot_key )
+		if reference_path in meta_data:
+			meta_data.erase( reference_path )
+		get_data_holder().set_meta( slot_key, meta_data )
 	
 func set_custom_wires( value:Dictionary ) -> void:
 	custom_wires = value

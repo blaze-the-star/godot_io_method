@@ -9,6 +9,8 @@ const CONNECTION_SIZE_RADIUS:int =  8
 signal input_connections_changed
 signal output_connections_changed
 
+onready var par_old_name:String = get_parent().get_name()
+
 #Container nodes
 onready var inputs_container:Node2D = null
 onready var outputs_container:Node2D = null
@@ -16,8 +18,45 @@ onready var outputs_container:Node2D = null
 func _enter_tree() -> void:
 	initialise_inputs_container()
 	initialise_outputs_container()
+	
+	if not get_parent().is_connected( "renamed", self, "_on_parent_renamed" ):
+		get_parent().connect( "renamed", self, "_on_parent_renamed" )
+
+func _on_parent_renamed() -> void:
+	pass
+#	#For outputs
+#	for output in get_outputs():
+#		var output_data:Dictionary = output.data
+#
+#		#Update input meta data
+#		for input in output_data["connected_inputs"]:
+#			var input_data:Dictionary = input.data
+#			input.set_data( input_data )
+#
+#		#Update meta data
+#		output.set_data( output_data )
+#
+#	#For inputs
+#	for input in get_inputs():
+#		var input_data:Dictionary = input.data
+#
+#		#Update output meta data
+#		for output in input_data["connected_outputs"]:
+#			var output_data:Dictionary = output.data
+#			output.set_data( output_data )
+#
+#		#Update meta data
+#		input.set_data( input_data )
+#
+#	par_old_name = get_parent().get_name()
+	
+func _on_script_changed() -> void:
+	par_old_name = get_parent().get_name()
 
 func _ready() -> void:
+	par_old_name = get_parent().get_name()
+	if not is_connected( "script_changed", self, "_on_script_changed" ):
+		connect( "script_changed", self, "_on_script_changed" )
 	if Engine.editor_hint:
 		add_to_group( "io_hub_2d" )
 
@@ -57,6 +96,14 @@ func get_inputs_container() -> Node2D:
 
 	return inputs_container
 
+func get_inputs() -> Array:
+	var inputs:Array = []
+	for child in get_inputs_container().get_children():
+		if child is InputSlot2D:
+			inputs.append(child)
+			
+	return inputs
+
 func get_output_within_range( point:Vector2 ) -> OutputSlot2D:
 	for output in get_outputs_container().get_children():
 		if output is OutputSlot2D:
@@ -71,6 +118,14 @@ func get_outputs_container() -> Node2D:
 		initialise_outputs_container()
 
 	return outputs_container
+
+func get_outputs() -> Array:
+	var outputs:Array = []
+	for child in get_outputs_container().get_children():
+		if child is OutputSlot2D:
+			outputs.append(child)
+			
+	return outputs
 
 func get_slot_within_range( point:Vector2 ):
 	"""

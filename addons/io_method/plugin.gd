@@ -25,7 +25,7 @@ enum SLOT_TYPES {
 }
 
 var edit_action:int = 0
-var edit_mode:int = EDIT_MODES.EDIT_SLOTS
+var edit_mode:int = EDIT_MODES.EDIT_WIRES
 var is_drawing_slots:bool = false setget set_is_drawing_slots
 var is_editing:bool = true setget set_is_editing
 var is_mouse_over_slot:bool = false
@@ -46,9 +46,10 @@ var popup_menu
 
 func _enter_tree():
 	connect( "scene_changed", self, "_on_scene_changed" )
+	
 	editing_mode_button = preload("res://addons/io_method/scenes/edit_mode_button/edit_mode_button.tscn").instance()
 	add_control_to_container( CONTAINER_CANVAS_EDITOR_MENU, editing_mode_button )
-	editing_mode_button.connect( "toggled", self, "set_is_editing" )
+#	editing_mode_button.connect( "toggled", self, "set_is_editing" )
 	editing_mode_button.hide()
 	
 	editing_wires_button = preload("res://addons/io_method/scenes/edit_wires_button/edit_wires_button.tscn").instance()
@@ -58,7 +59,7 @@ func _enter_tree():
 	
 	toggle_placing_slot_type = preload("res://addons/io_method/scenes/toggle_placing_slot_type/toggle_placing_slot_type.tscn").instance()
 	add_control_to_container( CONTAINER_CANVAS_EDITOR_MENU, toggle_placing_slot_type )
-	toggle_placing_slot_type.connect( "toggled", self, "_on_toggle_placing_slot_type" )
+#	toggle_placing_slot_type.connect( "toggled", self, "_on_toggle_placing_slot_type" )
 	toggle_placing_slot_type.hide()
 
 func _exit_tree():

@@ -15,17 +15,40 @@ var sent_initial_signal:bool = false
 var connected_inputs_hold:Array = [] 
 
 func _enter_tree() -> void:
-	update_wires_from_meta()
+	if connected_inputs_hold != []:
+		connect_slots( connected_inputs_hold )
+	else:
+		update_wires_from_meta()
+	connected_inputs_hold = []
 
 func _exit_tree() -> void:
-	connected_inputs_hold = data["connected_inputs"].duplicate(true)
-	disconnect_all_slots()
-	update()
+	if is_inside_tree():
+		connected_inputs_hold = []
+		for slot in data["connected_inputs"]:
+			connected_inputs_hold.append( slot )
+		disconnect_all_slots()
+		update()
 
 func _exited_tree() -> void:
-	if get_data_holder() != null: #Returns meta data if meta holder is still reachable
+	if has_data_holder(): #Returns meta data if meta holder is still reachable
 		connect_slots( connected_inputs_hold )
 		update()
+
+func _notification( what:int ) -> void:
+	match what:
+		NOTIFICATION_PATH_CHANGED:
+			#Called whenever a parent's name is changed
+			
+			#Update input meta data
+			for input in data["connected_inputs"]:
+				var input_data:Dictionary = input.data
+				input.set_data( input_data )
+	
+			#Remove old data reference from data-holder
+			remove_meta_reference( old_holder_path )
+	
+			#Update meta data
+			set_data( data )
 
 func _get_slot_type() -> String:
 	return "output"
@@ -38,11 +61,6 @@ func _on_dragged( dragged_slot ) -> void:
 			var wire_info:Dictionary = custom_wires[wire_name]
 			if "begin" in wire_info and "end" in wire_info:
 				var wire_position_changed:bool = re_rig_wire( wire_name )
-				
-#func _on_input_slot_dragged( dragged_slot ) -> void:
-#	var path_to_dragged:String = get_path_to(dragged_slot)
-#	if data["connected_inputs"].has( path_to_dragged ):
-#		re_rig_wire( path_to_dragged )
 
 func _ready() -> void:
 	._ready()
@@ -72,41 +90,49 @@ func _on_script_changed() -> void:
 	call_deferred( "update" )
 	
 func connect_slot( slot ) -> void:
-	var slot_path:String = get_data_holder().get_path_to(slot)
+	if slot != null:
+		var slot_path:String = get_data_holder().get_path_to(slot)
 
-	#Set in data
-	if not data["connected_inputs"].has(slot_path):
-		data["connected_inputs"].append( slot_path )
-	set_data( data )
-	#Draw wire
-	custom_wires[ slot_path ] = {"begin":get_global_position(), "end":slot.get_global_position(), "begin_node":get_data_holder().get_path_to(self), "end_node":slot_path}
-	if slot.is_connected( "dragged", self, "_on_input_slot_dragged" ):
-		slot.disconnect( "dragged", self, "_on_input_slot_dragged" )
-	slot.connect( "dragged", self, "_on_input_slot_dragged" )
-	generate_wire( slot_path, false )
-
-	slot._on_connected_to_output( self )
+		#Set in data
+		data = get_data()
+		if not "connected_inputs" in data:
+			data["connected_inputs"] = []
+		if not data["connected_inputs"].has( slot ):
+			data["connected_inputs"].append( slot )
+		slot._on_connected_to_output( self )
+		
+		set_data( data )
+		clear_junk_meta()
+		
+		#Draw wire
+		custom_wires[ slot_path ] = {"begin":get_global_position(), "end":slot.get_global_position(), "begin_node":get_data_holder().get_path_to(self), "end_node":slot_path}
+		if slot.is_connected( "dragged", self, "_on_input_slot_dragged" ):
+			slot.disconnect( "dragged", self, "_on_input_slot_dragged" )
+		slot.connect( "dragged", self, "_on_input_slot_dragged" )
+		generate_wire( slot_path, false )
 	
 func connect_slots( slots:Array ) -> void:
-	for slot_path in slots:
-		var slot = get_data_holder().get_node( slot_path )
+	for slot in slots:
 		connect_slot( slot )
 	
 func disconnect_all_slots() -> void:
-	custom_wires = {}
-	for slot_path in data["connected_inputs"]:
-		var slot = get_data_holder().get_node( slot_path )
+	for slot in data["connected_inputs"]:
 		disconnect_slot( slot )
+	custom_wires = {}
+	data["connected_inputs"] = []
+	set_data( data )
 		
 	
 func disconnect_slot( slot ) -> void:
-	var slot_path:NodePath = get_data_holder().get_path_to(slot)
-	if data["connected_inputs"].has( slot_path ):
-		data["connected_inputs"].erase( slot_path )
+	if slot != null and data["connected_inputs"].has( slot ):
+		data["connected_inputs"].erase( slot )
 		set_data( data )
 		#Draw wire
+		var slot_path:NodePath = get_data_holder().get_path_to(slot)
 		custom_wires.erase( slot_path )
-		slot.disconnect( "dragged", self, "_on_input_slot_dragged" )
+		#Signals
+		if slot.is_connected( "dragged", self, "_on_input_slot_dragged" ):
+			slot.disconnect( "dragged", self, "_on_input_slot_dragged" )
 		
 		slot._on_disconnected_from_output( self )
 	
@@ -115,11 +141,53 @@ func draw_slot() -> void:
 	draw_circle( Vector2(0,0), 6, Color(0,0,0) )
 	draw_circle( Vector2(0,0), 3, Color(1,0,0) )
 	
+func get_data() -> Dictionary:
+	"""
+	Get the meta data
+	"""
+	var owner_node:Node = get_data_holder()
+	if is_instance_valid(owner_node) and owner_node.has_meta( "io_" + _get_slot_type() ):
+		var data_library:Dictionary = owner_node.get_meta( "io_" + _get_slot_type() )
+		if get_data_key() in data_library:
+			#Convert paths to nodes
+			var slot_data:Dictionary = { "connected_inputs":[] }
+			if not "connected_inputs" in data_library[get_data_key()]:
+				data_library[get_data_key()]["connected_inputs"] = []
+			for path in data_library[get_data_key()]["connected_inputs"]:
+				var node:Node = meta_path_to_node(path)
+				if node != null:
+					slot_data["connected_inputs"].append( node )
+			#Return
+			return slot_data
+		
+	return {}
+	
 func get_hub() -> Node:
 	"""
 	As oppose to git hub.
 	"""
 	return get_node("../../")
+	
+func has_connections() -> bool:
+	return data["connected_inputs"] != []
+	
+func set_data( value:Dictionary ) -> void:
+	var owner_node:Node = get_data_holder()
+	if is_instance_valid(owner_node):
+		if not owner_node.has_meta( "io_" + _get_slot_type() ):
+			owner_node.set_meta( "io_" + _get_slot_type(), {} )
+		var data_library:Dictionary = owner_node.get_meta( "io_" + _get_slot_type() )
+		#Set connected inputs
+		if not get_data_key() in data_library:
+			data_library[get_data_key()] = {}
+		data_library[get_data_key()]["connected_inputs"] = []
+		for node in data["connected_inputs"]:
+			if node.has_connections():
+				data_library[get_data_key()]["connected_inputs"].append( node_to_meta_path(node) )
+				
+		#Confirm meta data
+		owner_node.set_meta( "io_" + _get_slot_type(), data_library )
+		clear_junk_meta()
 	
 func set_has_updated_in_frame( value:bool ) -> void:
 	has_updated_in_frame = value
@@ -157,16 +225,18 @@ func set_is_active( value:float, force_update:bool=false ) -> void:
 	var connected_input_slots:Array = data["connected_inputs"]
 	set_has_updated_in_frame( true ) #Must be set before trigger signal is called, otherwise will never be set
 	for slot in connected_input_slots:
-		if get_data_holder().has_node(slot):
-			value = max(value, -1)
-			value = min(value, 1)
-			get_data_holder().get_node(slot).trigger_signal( is_active, value, force_update )
+#		if get_data_holder().has_node(slot_path):
+		value = max(value, -1)
+		value = min(value, 1)
+		if slot != null:
+			slot.trigger_signal( is_active, value, force_update )
 			
 func update_wires_from_meta() -> void:
 	"""
 	Redraw wires using data from IOHub2D's parent
 	"""
 	data = get_data()
+	custom_wires = {}
 	if not "connected_inputs" in data:
 		data["connected_inputs"] = []
 	connect_slots( data["connected_inputs"] )
