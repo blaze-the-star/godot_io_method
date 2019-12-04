@@ -49,7 +49,7 @@ func _ready():
 		if not is_connected( "dragged", self, "_on_dragged" ):
 			connect( "dragged", self, "_on_dragged" )
 	else:
-		is_drawing = true
+		is_drawing = false
 		if not get_tree().is_connected( "idle_frame", self, "_on_idle_frame" ):
 			get_tree().connect( "idle_frame", self, "_on_idle_frame" )
 			

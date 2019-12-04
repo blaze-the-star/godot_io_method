@@ -16,40 +16,13 @@ onready var inputs_container:Node2D = null
 onready var outputs_container:Node2D = null
 
 func _enter_tree() -> void:
-	initialise_inputs_container()
-	initialise_outputs_container()
-	
 	if not get_parent().is_connected( "renamed", self, "_on_parent_renamed" ):
 		get_parent().connect( "renamed", self, "_on_parent_renamed" )
+		
+	yield( get_tree(), "idle_frame" )
+	initialise_inputs_container()
+	initialise_outputs_container()
 
-func _on_parent_renamed() -> void:
-	pass
-#	#For outputs
-#	for output in get_outputs():
-#		var output_data:Dictionary = output.data
-#
-#		#Update input meta data
-#		for input in output_data["connected_inputs"]:
-#			var input_data:Dictionary = input.data
-#			input.set_data( input_data )
-#
-#		#Update meta data
-#		output.set_data( output_data )
-#
-#	#For inputs
-#	for input in get_inputs():
-#		var input_data:Dictionary = input.data
-#
-#		#Update output meta data
-#		for output in input_data["connected_outputs"]:
-#			var output_data:Dictionary = output.data
-#			output.set_data( output_data )
-#
-#		#Update meta data
-#		input.set_data( input_data )
-#
-#	par_old_name = get_parent().get_name()
-	
 func _on_script_changed() -> void:
 	par_old_name = get_parent().get_name()
 
@@ -161,9 +134,8 @@ func is_input_connected( input_index:int ):
 	"""
 	Get if input slot is connected to an output slot
 	"""
-	var inputs_container:Node2D = get_inputs_container()
-	var input_slot:InputSlot2D = inputs_container.get_child( input_index )
-	return input_slot.is_connected or len(input_slot.connected_outputs) > 0
+	var input_slot:InputSlot2D = get_inputs()[input_index]
+	return len(input_slot.data["connected_outputs"]) > 0
 
 func is_output_connected( output_index:int ):
 	"""
